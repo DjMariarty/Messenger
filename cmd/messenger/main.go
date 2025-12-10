@@ -18,7 +18,7 @@ func main() {
 		&models.Chat{},
 		&models.Message{},
 	); err != nil {
-		log.Fatal("Не удалось выполнить миграции %v", err)
+		log.Fatalf("Не удалось выполнить миграции %v", err)
 	}
 
 	router := gin.Default()
