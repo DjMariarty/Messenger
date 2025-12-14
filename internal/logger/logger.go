@@ -9,6 +9,7 @@ import (
 func connectDB() *gorm.DB {
 	newLogger := logger.Default.LogMode(logger.Info)
 
+	dsn := ""
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 	})

@@ -2,32 +2,49 @@ package main
 
 import (
 	"log"
-	"os"
 
-	"github.com/DjMariarty/messenger/internal/config"
-	"github.com/DjMariarty/messenger/internal/models"
+	"github.com/DjMariarty/messenger/internal/repository"
+	service "github.com/DjMariarty/messenger/internal/services"
+	handler "github.com/DjMariarty/messenger/internal/transport"
+
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func main() {
-
-	db := config.SetUpDatabaseConnection()
-
-	if err := db.AutoMigrate(
-		&models.User{},
-		&models.Chat{},
-		&models.Message{},
-	); err != nil {
-		log.Fatal("Не удалось выполнить миграции %v", err)
+	// Подключаем базу данных (modernc.org/sqlite, полностью на Go)
+	db, err := gorm.Open(sqlite.Open("messenger.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("failed to connect database:", err)
 	}
 
+	// Создаем Gin роутер
 	router := gin.Default()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8081"
+	// Настраиваем маршруты для чатов
+	setupChatRoutes(router, db)
+
+	// Запускаем сервер
+	log.Println("Server started at http://localhost:8080")
+	if err := router.Run(":8080"); err != nil {
+		log.Fatal("failed to run server:", err)
 	}
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("не удалось запустить HTTP-сервер %v", err)
-	}
+}
+
+func setupChatRoutes(router *gin.Engine, db *gorm.DB) {
+	// 1. Создаем репозиторий
+	chatRepo := repository.NewChatRepository(db)
+
+	// 2. Создаем сервис
+	chatService := service.NewChatService(db, chatRepo)
+
+	// 3. Создаем хендлер
+	chatHandler := handler.NewChatHandler(chatService)
+
+	// 4. Настраиваем API группу
+	apiGroup := router.Group("/api")
+
+	// 5. Регистрируем эндпоинт
+	apiGroup.GET("/chats", chatHandler.GetChats)
 }
