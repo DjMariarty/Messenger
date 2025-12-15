@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/DjMariarty/messenger/internal/models"
+	"github.com/DjMariarty/messenger/internal/dto"
 	"github.com/DjMariarty/messenger/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +22,7 @@ func NewMessageHandler(service services.MessageService, log *slog.Logger) *Messa
 func (h *MessageHandler) CreateMessage(c *gin.Context) {
 	// логи на входе
 
-	var req models.CreateMessageRequest
+	var req dto.CreateMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.log.Warn("handler: invalid JSON in CreateMessage", slog.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

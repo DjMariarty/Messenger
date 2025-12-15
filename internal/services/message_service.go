@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/DjMariarty/messenger/internal/dto"
 	"github.com/DjMariarty/messenger/internal/models"
 	"github.com/DjMariarty/messenger/internal/repository"
 )
@@ -15,7 +16,7 @@ var (
 )
 
 type MessageService interface {
-	CreateMessage(req models.CreateMessageRequest) (*models.Message, error)
+	CreateMessage(req dto.CreateMessageRequest) (*models.Message, error)
 	GetMessagesByChatID(chatID uint) ([]models.Message, error)
 }
 
@@ -28,7 +29,7 @@ func NewMessageService(messages repository.MessageRepository, log *slog.Logger) 
 	return &messageService{messages: messages, log: log}
 }
 
-func (s *messageService) CreateMessage(req models.CreateMessageRequest) (*models.Message, error) {
+func (s *messageService) CreateMessage(req dto.CreateMessageRequest) (*models.Message, error) {
 	if req.ChatID == 0 {
 		s.log.Warn("service: invalid chatID")
 		return nil, ErrInvalidChatID

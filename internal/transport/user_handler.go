@@ -45,3 +45,19 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
+
+func (h *UserHandler) Me(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
+
+	user, err := h.users.GetByID(userID)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
+	})
+}

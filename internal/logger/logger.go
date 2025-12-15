@@ -1,5 +1,21 @@
 package logger
 
-import "log"
+import (
+	"log"
+	"time"
 
-var L = log.Default()
+	"github.com/gin-gonic/gin"
+)
+
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		log.Printf("%s %s %d %s",
+			c.Request.Method,
+			c.Request.URL.Path,
+			c.Writer.Status(),
+			time.Since(start),
+		)
+	}
+}
