@@ -6,6 +6,6 @@ type User struct {
 	gorm.Model
 
 	Name         string `json:"name"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
+	Email        string `json:"email" gorm:"uniqueIndex;not null"`
+	PasswordHash string `json:"-" gorm:"not null"`
 }

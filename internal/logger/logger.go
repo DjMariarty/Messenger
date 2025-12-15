@@ -1,19 +1,5 @@
 package logger
 
-import (
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-)
+import "log"
 
-func connectDB() *gorm.DB {
-	newLogger := logger.Default.LogMode(logger.Info)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: newLogger,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return db
-}
+var L = log.Default()

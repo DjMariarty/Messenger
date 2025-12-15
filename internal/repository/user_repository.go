@@ -25,7 +25,7 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 
 func (r *gormUserRepository) Create(user *models.User) error {
 	if user == nil {
-		return errors.New("Пустой пользователь")
+		return errors.New("пустой пользователь")
 	}
 	return r.db.Create(user).Error
 }
