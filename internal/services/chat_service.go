@@ -1,95 +1,105 @@
 package services
 
 import (
-    "errors"
-    "log"
-    "sort"
-    "time"
+	"errors"
+	"sort"
+	"time"
 
-    "github.com/DjMariarty/messenger/internal/models"
-    "github.com/DjMariarty/messenger/internal/repository"
+	"github.com/DjMariarty/messenger/internal/dto"
+	"github.com/DjMariarty/messenger/internal/models"
+	"github.com/DjMariarty/messenger/internal/repository"
+	"gorm.io/gorm"
 )
 
-var (
-    ErrInvalidUserID = errors.New("invalid user id")
-)
-
-type ChatPreview struct {
-    ChatID uint `json:"chat_id"`
-
-    Partner struct {
-        ID   uint   `json:"id"`
-        Name string `json:"name"`
-    } `json:"partner"`
-
-    LastMessage     string    `json:"last_message,omitempty"`
-    LastMessageTime time.Time `json:"last_message_time,omitempty"`
+type ChatService interface {
+	CreateChat(userID uint, req dto.CreateChatRequest) (*models.Chat, error)
+	GetChats(userID uint) ([]dto.ChatResponse, error)
 }
 
-type ChatService struct {
-    repo *repository.ChatRepository
+type chatService struct {
+	db    *gorm.DB
+	chats repository.ChatRepository
 }
 
-func NewChatService(repo *repository.ChatRepository) *ChatService {
-    return &ChatService{repo: repo}
+func NewChatService(db *gorm.DB, chats repository.ChatRepository) ChatService {
+	return &chatService{db: db, chats: chats}
 }
 
-func (s *ChatService) GetUserChatList(userID uint) ([]ChatPreview, error) {
-    log.Printf("[ChatService] GetUserChatList userID=%d", userID)
+func (s *chatService) CreateChat(userID uint, req dto.CreateChatRequest) (*models.Chat, error) {
+	if userID == 0 || req.PartnerID == 0 {
+		return nil, errors.New("invalid user id")
+	}
+	if userID == req.PartnerID {
+		return nil, errors.New("cannot create chat with yourself")
+	}
 
-    if userID == 0 {
-        return nil, ErrInvalidUserID
-    }
 
-    chats, err := s.repo.GetUserChats(userID)
-    if err != nil {
-        return nil, err
-    }
+	u1, u2 := userID, req.PartnerID
+	if u1 > u2 {
+		u1, u2 = u2, u1
+	}
 
-    previews := make([]ChatPreview, 0, len(chats))
 
-    for _, chat := range chats {
-        preview, err := s.buildPreview(chat, userID)
-        if err != nil {
-            log.Printf("[ChatService] buildPreview error: %v", err)
-            continue
-        }
-        previews = append(previews, preview)
-    }
+	existing, err := s.chats.FindByUsers(u1, u2)
+	if err == nil {
+		return existing, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 
-    sort.Slice(previews, func(i, j int) bool {
-        return previews[i].LastMessageTime.After(previews[j].LastMessageTime)
-    })
 
-    return previews, nil
+	chat := models.Chat{User1ID: u1, User2ID: u2}
+	if err := s.chats.Create(&chat); err != nil {
+		return nil, err
+	}
+
+	return &chat, nil
 }
 
-func (s *ChatService) buildPreview(chat models.Chat, currentUser uint) (ChatPreview, error) {
-    var preview ChatPreview
-    preview.ChatID = chat.ID
+func (s *chatService) GetChats(userID uint) ([]dto.ChatResponse, error) {
+	chats, err := s.chats.GetUserChats(userID)
+	if err != nil {
+		return nil, err
+	}
 
-    partnerID := chat.User1ID
-    if chat.User1ID == currentUser {
-        partnerID = chat.User2ID
-    }
+	res := make([]dto.ChatResponse, 0, len(chats))
 
-    name, err := s.repo.GetUserNameByID(partnerID)
-    if err != nil {
-        return preview, err
-    }
+	for _, ch := range chats {
+		lastMsg, err := s.chats.GetLastMessage(ch.ID)
+		if err != nil {
+			return nil, err
+		}
 
-    preview.Partner.ID = partnerID
-    preview.Partner.Name = name
+		var lastText string
+		var lastTime *time.Time
+		if lastMsg != nil {
+			lastText = lastMsg.Text
+			t := lastMsg.CreatedAt
+			lastTime = &t
+		}
 
-    lastMsg, err := s.repo.GetLastMessage(chat.ID)
-    if err != nil {
-        return preview, err
-    }
+		res = append(res, dto.ChatResponse{
+			ChatID:          ch.ID,
+			LastMessage:     lastText,
+			LastMessageTime: lastTime,
+		})
+	}
 
-    if lastMsg != nil {
-        preview.LastMessage = lastMsg.Text
-        preview.LastMessageTime = lastMsg.CreatedAt
-    }
+	sort.Slice(res, func(i, j int) bool {
+		ti := res[i].LastMessageTime
+		tj := res[j].LastMessageTime
+		if ti == nil && tj == nil {
+			return false
+		}
+		if ti == nil {
+			return false
+		}
+		if tj == nil {
+			return true
+		}
+		return ti.After(*tj)
+	})
 
-    return preview, nil
+	return res, nil
 }

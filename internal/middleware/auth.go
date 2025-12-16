@@ -10,19 +10,30 @@ import (
 
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Авторизация")
-		if header == "" || !strings.HasPrefix(header, "Bearer") {
+		
+		header := c.GetHeader("Authorization")
+		if header == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
 			return
 		}
-		tokenStr := strings.TrimSpace(strings.TrimPrefix(header, "Bearer"))
+
+		
+		if !strings.HasPrefix(header, "Bearer ") {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header"})
+			return
+		}
+
+		
+		tokenStr := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+
 		claims, err := auth.ParseToken(tokenStr)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
+
+		
 		c.Set("user_id", claims.UserID)
 		c.Next()
-
 	}
 }

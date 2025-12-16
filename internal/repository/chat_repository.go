@@ -1,73 +1,60 @@
 package repository
 
 import (
-    "log"
+	"errors"
 
-    "github.com/DjMariarty/messenger/internal/models"
-    "gorm.io/gorm"
+	"github.com/DjMariarty/messenger/internal/models"
+	"gorm.io/gorm"
 )
 
-type ChatRepository struct {
-    db *gorm.DB
+type ChatRepository interface {
+	FindByUsers(user1ID, user2ID uint) (*models.Chat, error)
+	Create(chat *models.Chat) error
+	GetUserChats(userID uint) ([]models.Chat, error)
+	GetLastMessage(chatID uint) (*models.Message, error)
 }
 
-func NewChatRepository(db *gorm.DB) *ChatRepository {
-    return &ChatRepository{db: db}
+type chatRepository struct {
+	db *gorm.DB
 }
 
-// Получить все чаты пользователя
-func (r *ChatRepository) GetUserChats(userID uint) ([]models.Chat, error) {
-    log.Printf("[ChatRepository] GetUserChats userID=%d", userID)
-
-    var chats []models.Chat
-    err := r.db.
-        Where("user1_id = ? OR user2_id = ?", userID, userID).
-        Find(&chats).Error
-
-    if err != nil {
-        log.Printf("[ChatRepository] DB error: %v", err)
-        return nil, err
-    }
-
-    return chats, nil
+func NewChatRepository(db *gorm.DB) ChatRepository {
+	return &chatRepository{db: db}
 }
 
-// Получить имя пользователя
-func (r *ChatRepository) GetUserNameByID(userID uint) (string, error) {
-    log.Printf("[ChatRepository] GetUserNameByID userID=%d", userID)
-
-    var name string
-    err := r.db.
-        Model(&models.User{}).
-        Select("name").
-        Where("id = ?", userID).
-        Scan(&name).Error
-
-    if err != nil {
-        log.Printf("[ChatRepository] DB error: %v", err)
-        return "", err
-    }
-
-    return name, nil
+func (r *chatRepository) FindByUsers(user1ID, user2ID uint) (*models.Chat, error) {
+	var chat models.Chat
+	err := r.db.Where("user1_id = ? AND user2_id = ?", user1ID, user2ID).First(&chat).Error
+	if err != nil {
+		return nil, err
+	}
+	return &chat, nil
 }
 
-// Получить последнее сообщение чата
-func (r *ChatRepository) GetLastMessage(chatID uint) (*models.Message, error) {
-    log.Printf("[ChatRepository] GetLastMessage chatID=%d", chatID)
+func (r *chatRepository) Create(chat *models.Chat) error {
+	if chat == nil {
+		return errors.New("nil chat")
+	}
+	return r.db.Create(chat).Error
+}
 
-    var msg models.Message
-    err := r.db.
-        Where("chat_id = ?", chatID).
-        Order("created_at DESC").
-        First(&msg).Error
+func (r *chatRepository) GetUserChats(userID uint) ([]models.Chat, error) {
+	var chats []models.Chat
+	err := r.db.Where("user1_id = ? OR user2_id = ?", userID, userID).Find(&chats).Error
+	if err != nil {
+		return nil, err
+	}
+	return chats, nil
+}
 
-    if err != nil {
-        if err == gorm.ErrRecordNotFound {
-            return nil, nil
-        }
-        log.Printf("[ChatRepository] DB error: %v", err)
-        return nil, err
-    }
-
-    return &msg, nil
+func (r *chatRepository) GetLastMessage(chatID uint) (*models.Message, error) {
+	var msg models.Message
+	err := r.db.Where("chat_id = ?", chatID).Order("created_at DESC").First(&msg).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &msg, nil
 }

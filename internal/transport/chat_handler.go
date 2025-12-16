@@ -1,60 +1,53 @@
-package transport 
-import (
-	"log"
-	"net/http"
-	"strconv"
+package transport
 
+import (
+	"net/http"
+
+	"github.com/DjMariarty/messenger/internal/dto"
 	"github.com/DjMariarty/messenger/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type ChatHandler struct {
-    service *services.ChatService
+	chats services.ChatService
 }
 
-func NewChatHandler(service *services.ChatService) *ChatHandler {
-    return &ChatHandler{service: service}
+func NewChatHandler(chats services.ChatService) *ChatHandler {
+	return &ChatHandler{chats: chats}
 }
 
+// POST /chats
+func (h *ChatHandler) CreateChat(c *gin.Context) {
+	userID := c.MustGet("user_id").(uint)
+
+	var req dto.CreateChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	chat, err := h.chats.CreateChat(userID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.CreateChatResponse{
+		ChatID:  chat.ID,
+		User1ID: chat.User1ID,
+		User2ID: chat.User2ID,
+	})
+}
+
+// GET /chats
 func (h *ChatHandler) GetChats(c *gin.Context) {
-    userIDValue, exists := c.Get("user_id")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-        return
-    }
+	userID := c.MustGet("user_id").(uint)
 
-    userID, err := parseUserID(userIDValue)
-    if err != nil || userID == 0 {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
-        return
-    }
+	list, err := h.chats.GetChats(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
 
-    log.Printf("[ChatHandler] GetChats userID=%d", userID)
-
-    chats, err := h.service.GetUserChatList(userID)
-    if err != nil {
-        log.Printf("[ChatHandler] service error: %v", err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load chats"})
-        return
-    }
-
-    c.JSON(http.StatusOK, chats)
-}
-
-func parseUserID(v interface{}) (uint, error) {
-    switch val := v.(type) {
-    case uint:
-        return val, nil
-    case int:
-        return uint(val), nil
-    case int64:
-        return uint(val), nil
-    case float64:
-        return uint(val), nil
-    case string:
-        parsed, err := strconv.ParseUint(val, 10, 32)
-        return uint(parsed), err
-    default:
-        return 0, strconv.ErrSyntax
-    }
+	c.JSON(http.StatusOK, list)
 }
