@@ -65,7 +65,7 @@ func main() {
 	messages := router.Group("/messages")
 	messages.Use(middleware.AuthRequired())
 	{
-		messages.POST("/send", messageHandler.CreateMessage)
+		messages.POST("", messageHandler.CreateMessage)
 		messages.GET("/:user_id", messageHandler.GetMessages)
 	}
 
